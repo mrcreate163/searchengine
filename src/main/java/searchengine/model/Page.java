@@ -9,7 +9,9 @@ import javax.persistence.Index;
 @Entity
 @Setter
 @Getter
-@Table(name = "page", indexes = {@Index(name = "path_index", columnList = "path")})
+@Table(name = "page", 
+       indexes = {@Index(name = "path_index", columnList = "path")},
+       uniqueConstraints = {@UniqueConstraint(name = "site_path_unique", columnNames = {"site_id", "path"})})
 public class Page {
 
     @Id

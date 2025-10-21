@@ -60,13 +60,15 @@ public class SiteMapBuilder extends RecursiveAction {
         try {
             Thread.sleep(500);
 
-            String path = url.replaceFirst(site.getUrl(), "");
+            String normalizedUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            String normalizedSiteUrl = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
+            String path = normalizedUrl.replace(normalizedSiteUrl, "");
             if (path.isEmpty()) {
                 path = "/";
             }
 
             // Проверяем, не обрабатывали ли мы уже эту страницу
-            if (allLinks.contains(url)) {
+            if (!allLinks.add(url)) {
                 return;
             }
 

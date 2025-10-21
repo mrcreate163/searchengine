@@ -20,6 +20,7 @@ import searchengine.repository.SiteRepository;
 import searchengine.services.indexing.SiteMapBuilder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
@@ -102,8 +103,11 @@ public class IndexingServiceImpl implements IndexingService {
     public IndexingResponse indexPage(String url) {
                 // Проверяем принадлежит ли URL к одному из сайтов в конфигурации
         Site configSite = null;
+        String normalizedUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        
         for (Site site : sitesList.getSites()) {
-            if (url.startsWith(site.getUrl())) {
+            String normalizedSiteUrl = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
+            if (normalizedUrl.startsWith(normalizedSiteUrl)) {
                 configSite = site;
                 break;
             }
@@ -125,14 +129,28 @@ public class IndexingServiceImpl implements IndexingService {
                 siteRepository.save(siteEntity);
             }
 
-
-            String path = url.replace(configSite.getUrl(), "");
+            String normalizedSiteUrl = configSite.getUrl().endsWith("/") ? configSite.getUrl().substring(0, configSite.getUrl().length() - 1) : configSite.getUrl();
+            String path = normalizedUrl.replace(normalizedSiteUrl, "");
             if (path.isEmpty()) {
                 path = "/";
             }
 
             Page existingPage = pageRepository.findBySiteAndPath(siteEntity, path);
             if (existingPage != null) {
+                // Получаем все индексы для удаляемой страницы
+                List<Index> indices = indexRepository.findByPage(existingPage);
+                
+                // Уменьшаем частоту лемм и удаляем леммы с нулевой частотой
+                for (Index index : indices) {
+                    Lemma lemma = index.getLemma();
+                    lemma.setFrequency(lemma.getFrequency() - 1);
+                    if (lemma.getFrequency() <= 0) {
+                        lemmaRepository.delete(lemma);
+                    } else {
+                        lemmaRepository.save(lemma);
+                    }
+                }
+                
                 indexRepository.deleteByPage(existingPage);
                 pageRepository.delete(existingPage);
             }

@@ -9,7 +9,8 @@ import java.util.List;
 @Entity
 @Setter
 @Getter
-@Table(name = "lemma")
+@Table(name = "lemma",
+       uniqueConstraints = {@UniqueConstraint(name = "site_lemma_unique", columnNames = {"site_id", "lemma"})})
 public class Lemma {
 
     @Id
