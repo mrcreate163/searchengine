@@ -2,9 +2,24 @@
 
 indexing-settings:
   sites:
-    - url: https://www.lenta.ru
+    - url: httpbin.org
       name: Лента.ру
     - url: https://www.skillbox.ru
       name: Skillbox
     - url: https://www.playback.ru
       name: PlayBack.Ru
+server:
+  port: 8080
+
+spring:
+  datasource:
+    username: username
+    password: password
+    url: jdbc:mysql://localhost:3306/searchengine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
