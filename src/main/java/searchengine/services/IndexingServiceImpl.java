@@ -102,8 +102,11 @@ public class IndexingServiceImpl implements IndexingService {
     public IndexingResponse indexPage(String url) {
                 // Проверяем принадлежит ли URL к одному из сайтов в конфигурации
         Site configSite = null;
+        String normalizedUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        
         for (Site site : sitesList.getSites()) {
-            if (url.startsWith(site.getUrl())) {
+            String normalizedSiteUrl = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
+            if (normalizedUrl.startsWith(normalizedSiteUrl)) {
                 configSite = site;
                 break;
             }
@@ -125,8 +128,8 @@ public class IndexingServiceImpl implements IndexingService {
                 siteRepository.save(siteEntity);
             }
 
-
-            String path = url.replace(configSite.getUrl(), "");
+            String normalizedSiteUrl = configSite.getUrl().endsWith("/") ? configSite.getUrl().substring(0, configSite.getUrl().length() - 1) : configSite.getUrl();
+            String path = normalizedUrl.replace(normalizedSiteUrl, "");
             if (path.isEmpty()) {
                 path = "/";
             }
