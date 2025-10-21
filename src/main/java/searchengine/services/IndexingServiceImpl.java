@@ -20,6 +20,7 @@ import searchengine.repository.SiteRepository;
 import searchengine.services.indexing.SiteMapBuilder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
@@ -136,6 +137,20 @@ public class IndexingServiceImpl implements IndexingService {
 
             Page existingPage = pageRepository.findBySiteAndPath(siteEntity, path);
             if (existingPage != null) {
+                // Получаем все индексы для удаляемой страницы
+                List<Index> indices = indexRepository.findByPage(existingPage);
+                
+                // Уменьшаем частоту лемм и удаляем леммы с нулевой частотой
+                for (Index index : indices) {
+                    Lemma lemma = index.getLemma();
+                    lemma.setFrequency(lemma.getFrequency() - 1);
+                    if (lemma.getFrequency() <= 0) {
+                        lemmaRepository.delete(lemma);
+                    } else {
+                        lemmaRepository.save(lemma);
+                    }
+                }
+                
                 indexRepository.deleteByPage(existingPage);
                 pageRepository.delete(existingPage);
             }

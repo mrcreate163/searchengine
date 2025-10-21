@@ -113,7 +113,7 @@ public class LemmatizationService {
 
     private String[] arrayContainsRussianWords(String text) {
         return text.toLowerCase(Locale.ROOT)
-                .replace("([^а-я\\s])", " ")
+                .replaceAll("[^а-яёa-z\\s]", " ")
                 .trim()
                 .split("\\s+");
     }

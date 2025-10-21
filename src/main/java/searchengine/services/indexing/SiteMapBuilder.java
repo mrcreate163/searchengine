@@ -68,7 +68,7 @@ public class SiteMapBuilder extends RecursiveAction {
             }
 
             // Проверяем, не обрабатывали ли мы уже эту страницу
-            if (allLinks.contains(url)) {
+            if (!allLinks.add(url)) {
                 return;
             }
 
