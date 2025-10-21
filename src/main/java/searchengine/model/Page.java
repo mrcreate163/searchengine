@@ -5,6 +5,7 @@ import lombok.Setter;
 
 import javax.persistence.*;
 import javax.persistence.Index;
+import java.util.List;
 
 @Entity
 @Setter
@@ -31,5 +32,7 @@ public class Page {
     @Column(columnDefinition = "MEDIUMTEXT",nullable = false)
     private String content;
 
+    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<searchengine.model.Index> indexes;
 
 }
