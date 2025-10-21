@@ -113,8 +113,6 @@ public class IndexingServiceImpl implements IndexingService {
             return new IndexingResponse(false, "Данный URL находится за пределами сайтов, указанных в конфигурации");
         }
 
-        // TODO: Реализовать индексацию одной страницы
-
         try {
             //Получаем или создаём сайт в БД
             searchengine.model.Site siteEntity = siteRepository.findByUrl(configSite.getUrl());
