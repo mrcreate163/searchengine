@@ -87,14 +87,11 @@ public class SiteMapBuilder extends RecursiveAction {
             page.setCode(response.statusCode());
             page.setContent(content);
 
-            synchronized (this) {
-                pageRepository.save(page);
+            pageRepository.save(page);
 
-
-                // Обновляем время последней активности
-                site.setStatusTime(LocalDateTime.now());
-                siteRepository.save(site);
-            }
+            // Обновляем время последней активности
+            site.setStatusTime(LocalDateTime.now());
+            siteRepository.save(site);
 
             // Ищем ссылки только на успешных страницах
             if (response.statusCode() == 200) {
@@ -139,29 +136,27 @@ public class SiteMapBuilder extends RecursiveAction {
                 String lemmaWord = entry.getKey();
                 Integer count = entry.getValue();
 
-                synchronized (this) {
-                    // Ищем или создаем лемму
-                    Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(site, lemmaWord);
-                    Lemma lemma;
+                // Ищем или создаем лемму
+                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(site, lemmaWord);
+                Lemma lemma;
 
-                    if (optionalLemma.isPresent()) {
-                        lemma = optionalLemma.get();
-                        lemma.setFrequency(lemma.getFrequency() + 1);
-                    } else {
-                        lemma = new Lemma();
-                        lemma.setSite(site);
-                        lemma.setLemma(lemmaWord);
-                        lemma.setFrequency(1);
-                    }
-                    lemmaRepository.save(lemma);
-
-                    // Создаем индекс
-                    Index index = new Index();
-                    index.setPage(page);
-                    index.setLemma(lemma);
-                    index.setRank(count.floatValue());
-                    indexRepository.save(index);
+                if (optionalLemma.isPresent()) {
+                    lemma = optionalLemma.get();
+                    lemma.setFrequency(lemma.getFrequency() + 1);
+                } else {
+                    lemma = new Lemma();
+                    lemma.setSite(site);
+                    lemma.setLemma(lemmaWord);
+                    lemma.setFrequency(1);
                 }
+                lemmaRepository.save(lemma);
+
+                // Создаем индекс
+                Index index = new Index();
+                index.setPage(page);
+                index.setLemma(lemma);
+                index.setRank(count.floatValue());
+                indexRepository.save(index);
             }
         } catch (Exception e) {
             log.error("Ошибка при индексации содержимого страницы: " + page.getPath(), e);
@@ -176,12 +171,10 @@ public class SiteMapBuilder extends RecursiveAction {
     }
 
     private void handleError(Exception e) {
-        synchronized (this) {
-            site.setStatus(Status.FAILED);
-            site.setLastError(e.getMessage());
-            site.setStatusTime(LocalDateTime.now());
-            siteRepository.save(site);
-        }
+        site.setStatus(Status.FAILED);
+        site.setLastError(e.getMessage());
+        site.setStatusTime(LocalDateTime.now());
+        siteRepository.save(site);
     }
 
     public static void stopIndexing() {

@@ -59,7 +59,7 @@ public class SearchServiceImpl implements SearchService {
         List<Map.Entry<Page, Float>> sortedResults = pageRelevanceMap.entrySet()
                 .stream()
                 .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
-                .toList();
+                .collect(Collectors.toList());
 
         //Применяем пагинацию
         int total = sortedResults.size();
@@ -75,7 +75,7 @@ public class SearchServiceImpl implements SearchService {
         //Формируем ответ
         List<SearchData> searchResults = paginatedResult.stream()
                 .map(entry -> createSearchData(entry.getKey(), entry.getValue(), queryLemmas))
-                .toList();
+                .collect(Collectors.toList());
 
         return new SearchResponse(true, total, searchResults);
     }
@@ -123,7 +123,7 @@ public class SearchServiceImpl implements SearchService {
                     double frequency = (double) lemma.getFrequency() / totalLemmas;
                     return frequency < 0.8; //Фильтрация лемм с частотой более 80%
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     private Map<Page, Float> findPagesWithAllLemmas(List<Lemma> lemmas) {

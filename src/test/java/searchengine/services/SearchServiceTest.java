@@ -188,4 +188,68 @@ class SearchServiceTest {
         assertTrue(response.isResult());
         assertEquals(0, response.getCount()); // Should be filtered due to high frequency
     }
+
+    @Test
+    void testSearch_PaginationWithMultipleResults() {
+        // This test verifies that the fix for UnsupportedOperationException works
+        // by testing pagination with subList operation on the results
+        
+        // Setup multiple pages with same lemma
+        Page page3 = new Page();
+        page3.setId(3);
+        page3.setSite(siteEntity);
+        page3.setPath("/page3");
+        page3.setCode(200);
+        page3.setContent("<html><head><title>Page 3</title></head><body>Content 3</body></html>");
+
+        Page page4 = new Page();
+        page4.setId(4);
+        page4.setSite(siteEntity);
+        page4.setPath("/page4");
+        page4.setCode(200);
+        page4.setContent("<html><head><title>Page 4</title></head><body>Content 4</body></html>");
+
+        Index index3 = new Index();
+        index3.setId(3);
+        index3.setPage(page3);
+        index3.setLemma(lemma1);
+        index3.setRank(2.0f);
+
+        Index index4 = new Index();
+        index4.setId(4);
+        index4.setPage(page4);
+        index4.setLemma(lemma1);
+        index4.setRank(1.0f);
+
+        Set<String> lemmas = new HashSet<>(Arrays.asList("поиск"));
+        when(lemmatizationService.getLemmaSet(anyString())).thenReturn(lemmas);
+        when(siteRepository.findAll()).thenReturn(Collections.singletonList(siteEntity));
+        when(lemmaRepository.findLemmasBySiteAndLemmaIn(any(), anyList()))
+                .thenReturn(Collections.singletonList(lemma1));
+        when(lemmaRepository.countTotalLemmasBySite(siteEntity)).thenReturn(100L);
+        when(indexRepository.findByLemmaIn(anyList()))
+                .thenReturn(Arrays.asList(index1, index3, index4));
+        when(indexRepository.findByPageAndLemmaIn(eq(page1), anyList()))
+                .thenReturn(Collections.singletonList(index1));
+        when(indexRepository.findByPageAndLemmaIn(eq(page3), anyList()))
+                .thenReturn(Collections.singletonList(index3));
+        when(indexRepository.findByPageAndLemmaIn(eq(page4), anyList()))
+                .thenReturn(Collections.singletonList(index4));
+        when(lemmatizationService.cleanHtmlContent(anyString())).thenReturn("test content");
+        when(lemmatizationService.getLemmaSet(anyString())).thenReturn(lemmas);
+
+        Site configSite = new Site();
+        configSite.setUrl("https://test.com");
+        configSite.setName("Test Site");
+        when(sitesList.getSites()).thenReturn(Collections.singletonList(configSite));
+
+        // Test pagination: offset=1, limit=2 (should return 2 results from the middle)
+        SearchResponse response = searchService.search("поиск", null, 1, 2);
+
+        // This would throw UnsupportedOperationException with .toList() instead of .collect(Collectors.toList())
+        assertNotNull(response);
+        assertTrue(response.isResult());
+        assertEquals(3, response.getCount()); // Total of 3 pages found
+        assertEquals(2, response.getData().size()); // But only 2 returned due to pagination
+    }
 }
