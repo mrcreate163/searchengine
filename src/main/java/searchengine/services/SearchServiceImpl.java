@@ -123,7 +123,7 @@ public class SearchServiceImpl implements SearchService {
                     double frequency = (double) lemma.getFrequency() / totalLemmas;
                     return frequency < 0.8; //Фильтрация лемм с частотой более 80%
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     private Map<Page, Float> findPagesWithAllLemmas(List<Lemma> lemmas) {
