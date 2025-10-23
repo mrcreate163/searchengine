@@ -9,6 +9,8 @@
 В Java 16+ метод `Stream.toList()` возвращает **неизменяемый (immutable)** список. Когда код пытался создать подсписок (subList) на строке 73 в `SearchServiceImpl.java`, это вызывало исключение, так как некоторые реализации immutable списков не поддерживают операцию subList.
 
 ### Код до исправления
+
+**Случай 1: Пагинация результатов (строки 59-62, 73)**
 ```java
 List<Map.Entry<Page, Float>> sortedResults = pageRelevanceMap.entrySet()
         .stream()
@@ -21,18 +23,58 @@ List<Map.Entry<Page, Float>> paginatedResult = sortedResults.subList(fromIndex, 
 // Эта операция может вызвать UnsupportedOperationException
 ```
 
+**Случай 2: Формирование ответа (строки 76-78)**
+```java
+List<SearchData> searchResults = paginatedResult.stream()
+        .map(entry -> createSearchData(entry.getKey(), entry.getValue(), queryLemmas))
+        .toList();  // Возвращает immutable список
+```
+
+**Случай 3: Фильтрация частотных лемм (строки 119-126)**
+```java
+private List<Lemma> filterFrequentLemmas(List<Lemma> lemmas, Site site) {
+    long totalLemmas = lemmaRepository.countTotalLemmasBySite(site);
+    return lemmas.stream()
+            .filter(lemma -> {
+                double frequency = (double) lemma.getFrequency() / totalLemmas;
+                return frequency < 0.8;
+            })
+            .toList();  // Возвращает immutable список
+}
+
+// В методе findPagesWithAllLemmas (строка 135):
+lemmas.sort(Comparator.comparingInt(Lemma::getFrequency));
+// ОШИБКА! Попытка модифицировать immutable список -> UnsupportedOperationException
+```
+
 ### Решение
-Заменили `.toList()` на `.collect(Collectors.toList())`, который возвращает **изменяемый (mutable)** ArrayList, поддерживающий все необходимые операции.
+Заменили все `.toList()` на `.collect(Collectors.toList())`, который возвращает **изменяемый (mutable)** ArrayList, поддерживающий все необходимые операции (subList, sort и т.д.).
 
 ```java
+// Случай 1
 List<Map.Entry<Page, Float>> sortedResults = pageRelevanceMap.entrySet()
         .stream()
         .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
         .collect(Collectors.toList());  // Возвращает mutable ArrayList
+
+// Случай 2
+List<SearchData> searchResults = paginatedResult.stream()
+        .map(entry -> createSearchData(entry.getKey(), entry.getValue(), queryLemmas))
+        .collect(Collectors.toList());  // Возвращает mutable ArrayList
+
+// Случай 3
+private List<Lemma> filterFrequentLemmas(List<Lemma> lemmas, Site site) {
+    return lemmas.stream()
+            .filter(lemma -> {
+                double frequency = (double) lemma.getFrequency() / totalLemmas;
+                return frequency < 0.8;
+            })
+            .collect(Collectors.toList());  // Возвращает mutable ArrayList
+}
 ```
 
 ### Измененные файлы
-- `src/main/java/searchengine/services/SearchServiceImpl.java` (строки 62, 78)
+- `src/main/java/searchengine/services/SearchServiceImpl.java` (строки 62, 78, 126)
 
 ---
 
@@ -161,8 +203,8 @@ mvn clean compile
 ### Запуск тестов
 ```bash
 mvn test
-# Tests run: 36, Failures: 0, Errors: 0, Skipped: 0
-# - SearchServiceTest: 6 тестов ✅
+# Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
+# - SearchServiceTest: 7 тестов ✅ (добавлен testSearch_PaginationWithMultipleResults)
 # - LemmatizationServiceTest: 12 тестов ✅
 # - IndexingServiceTest: 12 тестов ✅
 # - StatisticsServiceTest: 6 тестов ✅
@@ -220,7 +262,17 @@ tail -f logs/application.log
 ## Заключение
 
 Исправлены две критические ошибки:
-1. ✅ **UnsupportedOperationException** - заменен immutable список на mutable
+1. ✅ **UnsupportedOperationException** - найдено и исправлено 3 случая использования immutable списков:
+   - В пагинации результатов поиска (subList)
+   - В формировании ответа поиска
+   - В фильтрации частотных лемм (sort)
 2. ✅ **Deadlock при индексации** - удалена избыточная синхронизация, используются механизмы БД
 
-Оба исправления минимальны и хирургически точны, затрагивают только проблемные участки кода.
+Все исправления минимальны и хирургически точны, затрагивают только проблемные участки кода.
+
+### Добавлен новый тест
+Тест `testSearch_PaginationWithMultipleResults` проверяет корректность работы пагинации и выявил третий случай ошибки с immutable списком. Этот тест:
+- Создает несколько страниц с результатами поиска
+- Проверяет пагинацию (offset=1, limit=2)
+- Убеждается, что `.subList()` работает корректно
+- Проверяет, что сортировка лемм не вызывает исключений
