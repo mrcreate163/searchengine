@@ -2,8 +2,6 @@
 
 indexing-settings:
   sites:
-    - url: https://httpbin.org
-      name: Лента.ру
     - url: https://www.skillbox.ru
       name: Skillbox
     - url: https://www.playback.ru
