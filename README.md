@@ -297,6 +297,46 @@ The project follows standard Java coding conventions:
 - Write tests for new features
 - Keep methods focused and small
 
+## 🌐 Deployment
+
+This project is ready for deployment to production! See our comprehensive deployment guides:
+
+### 📚 Deployment Documentation
+
+- **[📘 Complete Deployment Guide (Russian)](DEPLOYMENT_GUIDE.md)** - Подробное пошаговое руководство по развертыванию на DigitalOcean с доменом от Namecheap
+- **[⚡ Quick Start Guide (Russian)](DEPLOYMENT_QUICKSTART.md)** - Краткая справка и основные команды
+
+### 🚀 Quick Deployment Overview
+
+The project includes everything you need for production deployment:
+
+- ✅ **Dockerfile** - Multi-stage build with security best practices
+- ✅ **docker-compose.yml** - Full production setup with MySQL, Nginx, and SSL
+- ✅ **Automated scripts** - `deploy.sh` and `setup-ssl.sh` for easy deployment
+- ✅ **Production config** - Optimized `application-prod.yaml`
+- ✅ **Nginx reverse proxy** - With SSL/TLS support
+- ✅ **Health checks** - Built-in monitoring endpoints
+- ✅ **Auto-renewing SSL** - Free certificates from Let's Encrypt
+
+### Deployment Stack
+
+- **Cloud Provider:** DigitalOcean (or any VPS)
+- **Operating System:** Ubuntu 22.04 LTS
+- **Containerization:** Docker & Docker Compose
+- **Web Server:** Nginx (reverse proxy)
+- **Database:** MySQL 8.0
+- **SSL/TLS:** Let's Encrypt (Certbot)
+- **Domain:** Namecheap (or any DNS provider)
+
+### One-Command Deploy
+
+```bash
+# On your server
+./deploy.sh
+```
+
+For detailed instructions, including DigitalOcean setup, DNS configuration, and SSL setup, please refer to the [Complete Deployment Guide](DEPLOYMENT_GUIDE.md).
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

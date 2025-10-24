@@ -1,0 +1,64 @@
+# Production configuration for Search Engine
+# This file should be used with SPRING_PROFILES_ACTIVE=prod
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  datasource:
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  thymeleaf:
+    cache: true
+
+# Indexing settings
+indexing-settings:
+  sites: ${INDEXING_SITES}
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    searchengine: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+  file:
+    name: /var/log/searchengine/application.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Actuator endpoints for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
