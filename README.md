@@ -84,6 +84,8 @@ View real-time statistics about indexed sites, pages, and lemmas. Monitor the st
 - **Start Indexing**: Begin crawling and indexing all configured websites
 - **Stop Indexing**: Halt the indexing process at any time
 - **Add/Update Page**: Index a single page by providing its URL
+- **Add Site**: Dynamically add a new site to the configuration via API
+- **Remove Site**: Remove a site from the configuration via API
 
 ### Search
 Enter your search query and optionally select a specific site to search within. Results are ranked by relevance with highlighted keywords in snippets.
@@ -118,6 +120,47 @@ GET /api/statistics
 ```
 Returns comprehensive statistics about indexed sites, pages, and lemmas.
 
+### Site Management
+```
+POST /api/site
+```
+Add a new site to the indexing configuration dynamically.
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com",
+  "name": "Example Site"
+}
+```
+
+**Response:**
+```json
+{
+  "result": true
+}
+```
+
+```
+DELETE /api/site?url={siteUrl}
+```
+Remove a site from the indexing configuration.
+
+**Response:**
+```json
+{
+  "result": true
+}
+```
+
+**Error Response:**
+```json
+{
+  "result": false,
+  "error": "Error message description"
+}
+```
+
 ### Indexing Management
 ```
 GET /api/startIndexing
@@ -148,8 +191,11 @@ mvn test
 **Test Coverage:**
 - ✅ LemmatizationService: 12 tests
 - ✅ IndexingService: 12 tests  
-- ✅ SearchService: 6 tests
+- ✅ SiteManagement: 15 tests
+- ✅ SearchService: 7 tests
 - ✅ StatisticsService: 6 tests
+
+**Total: 52 tests, all passing** ✅
 
 ## 🛠️ Technologies Used
 

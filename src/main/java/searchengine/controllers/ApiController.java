@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.dto.search.SearchResponse;
+import searchengine.dto.site.SiteRequest;
+import searchengine.dto.site.SiteResponse;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.SearchService;
@@ -47,5 +49,15 @@ public class ApiController {
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(searchService.search(query, site, offset, limit));
+    }
+    
+    @PostMapping("/site")
+    public ResponseEntity<SiteResponse> addSite(@RequestBody SiteRequest siteRequest) {
+        return ResponseEntity.ok(indexingService.addSite(siteRequest));
+    }
+    
+    @DeleteMapping("/site")
+    public ResponseEntity<SiteResponse> removeSite(@RequestParam String url) {
+        return ResponseEntity.ok(indexingService.removeSite(url));
     }
 }

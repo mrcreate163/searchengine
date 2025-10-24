@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingResponse;
+import searchengine.dto.site.SiteRequest;
+import searchengine.dto.site.SiteResponse;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
@@ -241,5 +243,76 @@ public class IndexingServiceImpl implements IndexingService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+    
+    @Override
+    public SiteResponse addSite(SiteRequest siteRequest) {
+        if (siteRequest.getUrl() == null || siteRequest.getUrl().trim().isEmpty()) {
+            return new SiteResponse(false, "URL не может быть пустым");
+        }
+        
+        if (siteRequest.getName() == null || siteRequest.getName().trim().isEmpty()) {
+            return new SiteResponse(false, "Название сайта не может быть пустым");
+        }
+        
+        // Normalize URL
+        String normalizedUrl = siteRequest.getUrl().trim();
+        if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+            return new SiteResponse(false, "URL должен начинаться с http:// или https://");
+        }
+        
+        // Remove trailing slash for consistency
+        if (normalizedUrl.endsWith("/")) {
+            normalizedUrl = normalizedUrl.substring(0, normalizedUrl.length() - 1);
+        }
+        
+        // Check if site already exists in configuration
+        for (Site site : sitesList.getSites()) {
+            String existingUrl = site.getUrl().endsWith("/") ? 
+                site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
+            if (existingUrl.equals(normalizedUrl)) {
+                return new SiteResponse(false, "Сайт с таким URL уже существует в конфигурации");
+            }
+        }
+        
+        // Add site to configuration
+        Site newSite = new Site();
+        newSite.setUrl(normalizedUrl);
+        newSite.setName(siteRequest.getName().trim());
+        sitesList.addSite(newSite);
+        
+        log.info("Сайт добавлен в конфигурацию: {} - {}", newSite.getUrl(), newSite.getName());
+        
+        return new SiteResponse(true);
+    }
+    
+    @Override
+    public SiteResponse removeSite(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return new SiteResponse(false, "URL не может быть пустым");
+        }
+        
+        // Normalize URL
+        String normalizedUrl = url.trim();
+        if (normalizedUrl.endsWith("/")) {
+            normalizedUrl = normalizedUrl.substring(0, normalizedUrl.length() - 1);
+        }
+        
+        // Check if indexing is running for this site
+        searchengine.model.Site siteEntity = siteRepository.findByUrl(normalizedUrl);
+        if (siteEntity != null && siteEntity.getStatus().equals(Status.INDEXING)) {
+            return new SiteResponse(false, "Невозможно удалить сайт: индексация в процессе. Остановите индексацию перед удалением.");
+        }
+        
+        // Remove from configuration
+        boolean removed = sitesList.removeSite(normalizedUrl);
+        
+        if (!removed) {
+            return new SiteResponse(false, "Сайт с таким URL не найден в конфигурации");
+        }
+        
+        log.info("Сайт удален из конфигурации: {}", normalizedUrl);
+        
+        return new SiteResponse(true);
     }
 }
