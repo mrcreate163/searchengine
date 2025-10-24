@@ -97,6 +97,10 @@ Thumbs.db
 ./application.yaml
 application-local.yml
 application-prod.yml
+.env
+
+# SSL certificates and nginx configs (generated)
+certbot/
 
 # H2 Database
 *.h2.db
