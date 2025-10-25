@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deployment script for Search Engine on DigitalOcean
+# Deployment script for Search Engine on Beget VPS (or any Ubuntu VPS)
 
 set -e
 

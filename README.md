@@ -303,7 +303,7 @@ This project is ready for deployment to production! See our comprehensive deploy
 
 ### 📚 Deployment Documentation
 
-- **[📘 Complete Deployment Guide (Russian)](DEPLOYMENT_GUIDE.md)** - Подробное пошаговое руководство по развертыванию на DigitalOcean с доменом от Namecheap
+- **[📘 Complete Deployment Guide (Russian)](DEPLOYMENT_GUIDE.md)** - Подробное пошаговое руководство по развертыванию на Beget VPS с собственным доменом
 - **[⚡ Quick Start Guide (Russian)](DEPLOYMENT_QUICKSTART.md)** - Краткая справка и основные команды
 
 ### 🚀 Quick Deployment Overview
@@ -320,13 +320,13 @@ The project includes everything you need for production deployment:
 
 ### Deployment Stack
 
-- **Cloud Provider:** DigitalOcean (or any VPS)
+- **Cloud Provider:** Beget VPS (or any VPS with Ubuntu)
 - **Operating System:** Ubuntu 22.04 LTS
 - **Containerization:** Docker & Docker Compose
 - **Web Server:** Nginx (reverse proxy)
 - **Database:** MySQL 8.0
 - **SSL/TLS:** Let's Encrypt (Certbot)
-- **Domain:** Namecheap (or any DNS provider)
+- **Domain:** Any DNS provider (Beget, Namecheap, REG.RU, etc.)
 
 ### One-Command Deploy
 
@@ -335,7 +335,7 @@ The project includes everything you need for production deployment:
 ./deploy.sh
 ```
 
-For detailed instructions, including DigitalOcean setup, DNS configuration, and SSL setup, please refer to the [Complete Deployment Guide](DEPLOYMENT_GUIDE.md).
+For detailed instructions, including Beget VPS setup, DNS configuration, and SSL setup, please refer to the [Complete Deployment Guide](DEPLOYMENT_GUIDE.md).
 
 ## 🤝 Contributing
 
