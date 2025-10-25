@@ -6,6 +6,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.dao.DataIntegrityViolationException;
 import searchengine.model.*;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
@@ -13,6 +14,7 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.LemmatizationService;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,17 +60,18 @@ public class SiteMapBuilder extends RecursiveAction {
             return;
         }
         try {
-            Thread.sleep(500);
+            Thread.sleep(200);
 
-            String normalizedUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-            String normalizedSiteUrl = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
-            String path = normalizedUrl.replace(normalizedSiteUrl, "");
+            String normalizedUrl = trimTrailingSlash(url);
+            String normalizedSiteUrl = trimTrailingSlash(site.getUrl());
+            String path = normalizedUrl.replaceFirst("^" + java.util.regex.Pattern.quote(normalizedSiteUrl), "");
             if (path.isEmpty()) {
                 path = "/";
             }
 
-            // Проверяем, не обрабатывали ли мы уже эту страницу
-            if (!allLinks.add(url)) {
+            // Канонический ключ для дедупликации: siteUrl + path
+            String canonicalKey = normalizedSiteUrl + path;
+            if (!allLinks.add(canonicalKey)) {
                 return;
             }
 
@@ -80,20 +83,27 @@ public class SiteMapBuilder extends RecursiveAction {
             Document document = response.parse();
             String content = document.html();
 
-            // Сохраняем страницу
-            Page page = new Page();
-            page.setSite(site);
-            page.setPath(path);
+            // Сохраняем или читаем существующую страницу (защита от гонок)
+            Page page = pageRepository.findBySiteAndPath(site, path);
+            if (page == null) {
+                page = new Page();
+                page.setSite(site);
+                page.setPath(path);
+            }
             page.setCode(response.statusCode());
             page.setContent(content);
-
-            pageRepository.save(page);
+            try {
+                page = pageRepository.save(page);
+            } catch (DataIntegrityViolationException ex) {
+                // Страница уже создана параллельно – перечитаем
+                page = pageRepository.findBySiteAndPath(site, path);
+            }
 
             // Обновляем время последней активности
             site.setStatusTime(LocalDateTime.now());
             siteRepository.save(site);
 
-            // Ищем ссылки только на успешных страницах
+            // Ищем ссылки и индексируем только успешные страницы
             if (response.statusCode() == 200) {
                 indexPageContent(page, content);
 
@@ -102,8 +112,7 @@ public class SiteMapBuilder extends RecursiveAction {
 
                 for (Element link : links) {
                     String childUrl = link.absUrl("href");
-
-                    if (isValidUrl(childUrl, site.getUrl()) && !allLinks.contains(childUrl)) {
+                    if (isValidUrl(childUrl, site.getUrl())) {
                         SiteMapBuilder task = new SiteMapBuilder(
                                 childUrl,
                                 site,
@@ -136,38 +145,66 @@ public class SiteMapBuilder extends RecursiveAction {
                 String lemmaWord = entry.getKey();
                 Integer count = entry.getValue();
 
-                // Ищем или создаем лемму
-                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(site, lemmaWord);
+                // Ищем или создаем лемму с защитой от гонок
                 Lemma lemma;
-
+                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(site, lemmaWord);
                 if (optionalLemma.isPresent()) {
                     lemma = optionalLemma.get();
                     lemma.setFrequency(lemma.getFrequency() + 1);
+                    lemmaRepository.save(lemma);
                 } else {
                     lemma = new Lemma();
                     lemma.setSite(site);
                     lemma.setLemma(lemmaWord);
                     lemma.setFrequency(1);
+                    try {
+                        lemmaRepository.save(lemma);
+                    } catch (DataIntegrityViolationException ex) {
+                        // Уже вставлена параллельным потоком – перечитываем
+                        lemma = lemmaRepository.findBySiteAndLemma(site, lemmaWord).orElseThrow(() -> ex);
+                        lemma.setFrequency(lemma.getFrequency() + 1);
+                        lemmaRepository.save(lemma);
+                    }
                 }
-                lemmaRepository.save(lemma);
 
-                // Создаем индекс
-                Index index = new Index();
-                index.setPage(page);
-                index.setLemma(lemma);
-                index.setRank(count.floatValue());
-                indexRepository.save(index);
+                // Создаём индекс, избегая дубликатов
+                if (!indexRepository.existsByPageAndLemma(page, lemma)) {
+                    Index index = new Index();
+                    index.setPage(page);
+                    index.setLemma(lemma);
+                    index.setRank(count.floatValue());
+                    try {
+                        indexRepository.save(index);
+                    } catch (DataIntegrityViolationException ex) {
+                        // Индекс уже создан другим потоком – пропускаем
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("Ошибка при индексации содержимого страницы: " + page.getPath(), e);
         }
     }
 
-    private boolean isValidUrl(String url, String siteUrl) {
-        return url.startsWith(siteUrl) &&
-                !url.contains("#") &&
-                !url.matches(".*(\\.(jpg|jpeg|png|gif|bmp|pdf|doc|docx|xls|xlsx|ppt|pptx|mp3|mp4|avi|mov|wmv|zip|rar))$") &&
-                url.length() < 255;
+    private boolean isValidUrl(String candidateUrl, String siteUrl) {
+        try {
+            URI c = new URI(candidateUrl);
+            URI s = new URI(siteUrl);
+            if (c.getHost() == null || s.getHost() == null) return false;
+            boolean sameHost = c.getHost().equalsIgnoreCase(s.getHost());
+            if (!sameHost) return false;
+            String path = c.getPath() == null ? "/" : c.getPath();
+            // фильтр якорей и бинарных ресурсов
+            return (c.getFragment() == null)
+                    && !path.matches(".*(\\.(jpg|jpeg|png|gif|bmp|pdf|doc|docx|xls|xlsx|ppt|pptx|mp3|mp4|avi|mov|wmv|zip|rar))$")
+                    && candidateUrl.length() < 2048;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null) return null;
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private void handleError(Exception e) {

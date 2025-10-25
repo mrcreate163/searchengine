@@ -2,10 +2,14 @@
 
 indexing-settings:
   sites:
-    - url: https://www.skillbox.ru
-      name: Skillbox
-    - url: https://www.playback.ru
-      name: PlayBack.Ru
+#    - url: https://www.skillbox.ru
+#      name: Skillbox
+
+#    - url: https://www.culture.ru/literature/poems/author-vladimir-mayakovskii
+#      name: Маяковский
+
+    - url: https://markulmusic.com/
+      name: Markul
 server:
   port: 8080
 

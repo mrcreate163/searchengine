@@ -38,7 +38,11 @@ spring:
 
 # Indexing settings
 indexing-settings:
-  sites: ${INDEXING_SITES}
+  sites:
+    - url: https://markulmusic.com/
+      name: markul
+    - url: https://oxxxymiron.com/
+      name: oxxxymiron
 
 # Logging configuration
 logging:

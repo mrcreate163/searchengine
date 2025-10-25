@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
@@ -21,6 +22,7 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.indexing.SiteMapBuilder;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +40,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final LemmatizationService lemmatizationService;
     private final IndexRepository indexRepository;
     private final LemmaRepository lemmaRepository;
-        private volatile ForkJoinPool forkJoinPool;
+    private volatile ForkJoinPool forkJoinPool;
 
 
     @Override
@@ -47,7 +49,17 @@ public class IndexingServiceImpl implements IndexingService {
             return new IndexingResponse(false, "Индексация уже запущена");
         }
 
-        siteRepository.deleteAll();
+        // Безопасная очистка БД: сначала индексы, затем страницы, затем леммы и сайты
+        try {
+            indexRepository.deleteAll();
+            pageRepository.deleteAll();
+            lemmaRepository.deleteAll();
+            siteRepository.deleteAll();
+        } catch (Exception e) {
+            log.error("Ошибка при очистке БД перед индексацией", e);
+            return new IndexingResponse(false, "Не удалось очистить БД перед индексацией: " + e.getMessage());
+        }
+
         SiteMapBuilder.resetIndexing();
 
         forkJoinPool = new ForkJoinPool();
@@ -103,16 +115,28 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse indexPage(String url) {
-                // Проверяем принадлежит ли URL к одному из сайтов в конфигурации
+        // Проверяем принадлежит ли URL к одному из сайтов в конфигурации (по host)
         Site configSite = null;
-        String normalizedUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-        
+        String host;
+        try {
+            host = new URI(url).getHost();
+        } catch (Exception e) {
+            return new IndexingResponse(false, "Некорректный URL: " + url);
+        }
+        if (host == null) {
+            return new IndexingResponse(false, "Некорректный URL: отсутствует host");
+        }
+        host = normalizeHost(host);
+
         for (Site site : sitesList.getSites()) {
-            String normalizedSiteUrl = site.getUrl().endsWith("/") ? site.getUrl().substring(0, site.getUrl().length() - 1) : site.getUrl();
-            if (normalizedUrl.startsWith(normalizedSiteUrl)) {
-                configSite = site;
-                break;
-            }
+            try {
+                String siteHost = new URI(site.getUrl()).getHost();
+                siteHost = normalizeHost(siteHost);
+                if (host.equalsIgnoreCase(siteHost)) {
+                    configSite = site;
+                    break;
+                }
+            } catch (Exception ignored) { }
         }
 
         if (configSite == null) {
@@ -120,7 +144,7 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         try {
-            //Получаем или создаём сайт в БД
+            // Получаем или создаём сайт в БД
             searchengine.model.Site siteEntity = siteRepository.findByUrl(configSite.getUrl());
             if (siteEntity == null) {
                 siteEntity = new searchengine.model.Site();
@@ -131,33 +155,32 @@ public class IndexingServiceImpl implements IndexingService {
                 siteRepository.save(siteEntity);
             }
 
-            String normalizedSiteUrl = configSite.getUrl().endsWith("/") ? configSite.getUrl().substring(0, configSite.getUrl().length() - 1) : configSite.getUrl();
-            String path = normalizedUrl.replace(normalizedSiteUrl, "");
+            // Вычисляем относительный путь
+            String normalizedSiteUrl = trimTrailingSlash(configSite.getUrl());
+            String normalizedUrl = trimTrailingSlash(url);
+            String path = normalizedUrl.replaceFirst("^" + java.util.regex.Pattern.quote(normalizedSiteUrl), "");
             if (path.isEmpty()) {
                 path = "/";
             }
 
             Page existingPage = pageRepository.findBySiteAndPath(siteEntity, path);
             if (existingPage != null) {
-                // Получаем все индексы для удаляемой страницы
+                // Удаляем связанные индексы и корректируем частоты лемм
                 List<Index> indices = indexRepository.findByPage(existingPage);
-                
-                // Уменьшаем частоту лемм и удаляем леммы с нулевой частотой
                 for (Index index : indices) {
                     Lemma lemma = index.getLemma();
-                    lemma.setFrequency(lemma.getFrequency() - 1);
+                    lemma.setFrequency(Math.max(0, lemma.getFrequency() - 1));
                     if (lemma.getFrequency() <= 0) {
                         lemmaRepository.delete(lemma);
                     } else {
                         lemmaRepository.save(lemma);
                     }
                 }
-                
                 indexRepository.deleteByPage(existingPage);
                 pageRepository.delete(existingPage);
             }
 
-            //загружаем и сохраняем страницу
+            // Загружаем и сохраняем страницу
             Connection.Response response = Jsoup.connect(url)
                     .userAgent("HeliontSearchBot")
                     .timeout(10000)
@@ -173,7 +196,6 @@ public class IndexingServiceImpl implements IndexingService {
             page.setContent(content);
             pageRepository.save(page);
 
-
             if (response.statusCode() == 200) {
                 indexPageContent(page, content, siteEntity);
             }
@@ -182,6 +204,12 @@ public class IndexingServiceImpl implements IndexingService {
         } catch (Exception e) {
             return new IndexingResponse(false, "Ошибка при индексации страницы: " + e.getMessage());
         }
+    }
+
+    private String normalizeHost(String h) {
+        if (h == null) return null;
+        String lower = h.toLowerCase();
+        return lower.startsWith("www.") ? lower.substring(4) : lower;
     }
 
     private void indexPageContent(Page page, String content, searchengine.model.Site configSite) {
@@ -193,30 +221,49 @@ public class IndexingServiceImpl implements IndexingService {
                 String lemmaWord = entry.getKey();
                 Integer count = entry.getValue();
 
-                //Ищем или создаём лемму
-                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(configSite, lemmaWord);
+                // Ищем или создаём лемму с защитой от гонок
                 Lemma lemma;
-
+                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(configSite, lemmaWord);
                 if (optionalLemma.isPresent()) {
                     lemma = optionalLemma.get();
                     lemma.setFrequency(lemma.getFrequency() + 1);
+                    lemmaRepository.save(lemma);
                 } else {
                     lemma = new Lemma();
                     lemma.setSite(configSite);
                     lemma.setLemma(lemmaWord);
                     lemma.setFrequency(1);
+                    try {
+                        lemmaRepository.save(lemma);
+                    } catch (DataIntegrityViolationException ex) {
+                        // Лемма уже вставлена параллельным потоком — перечитываем
+                        lemma = lemmaRepository.findBySiteAndLemma(configSite, lemmaWord).orElseThrow(() -> ex);
+                        lemma.setFrequency(lemma.getFrequency() + 1);
+                        lemmaRepository.save(lemma);
+                    }
                 }
-                lemmaRepository.save(lemma);
 
-                Index index = new Index();
-                index.setPage(page);
-                index.setLemma(lemma);
-                index.setRank(count.floatValue());
-                indexRepository.save(index);
+                // Создаем индекс, избегая дубликатов
+                if (!indexRepository.existsByPageAndLemma(page, lemma)) {
+                    Index index = new Index();
+                    index.setPage(page);
+                    index.setLemma(lemma);
+                    index.setRank(count.floatValue());
+                    try {
+                        indexRepository.save(index);
+                    } catch (DataIntegrityViolationException ex) {
+                        // Индекс уже создан другим потоком — пропускаем
+                    }
+                }
             }
-                } catch (Exception e) {
+        } catch (Exception e) {
             log.error("Ошибка при индексации содержимого страницы: " + page.getPath(), e);
         }
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null) return null;
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private boolean isIndexingRunning() {
@@ -227,10 +274,13 @@ public class IndexingServiceImpl implements IndexingService {
     private void monitorIndexing() {
         try {
             if (forkJoinPool != null) {
-                                ForkJoinPool pool = forkJoinPool;
-                while (!pool.isTerminated()) {
-                    Thread.sleep(1000);
+                ForkJoinPool pool = forkJoinPool;
+                // Ждём пока пул будет в состоянии покоя
+                while (!(pool.isQuiescent() && pool.getActiveThreadCount() == 0 &&
+                        pool.getQueuedSubmissionCount() == 0 && pool.getQueuedTaskCount() == 0)) {
+                    Thread.sleep(500);
                 }
+                pool.shutdown();
 
                 siteRepository.findAll().forEach(site -> {
                     if (site.getStatus().equals(Status.INDEXING)) {

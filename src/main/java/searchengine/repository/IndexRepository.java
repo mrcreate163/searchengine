@@ -25,4 +25,6 @@ public interface IndexRepository extends JpaRepository<Index, Integer> {
 
     @Query("select i from Index i where i.page = :page and i.lemma in :lemmas")
     List<Index> findByPageAndLemmaIn(@Param("page") Page page, @Param("lemmas") List<Lemma> lemmas);
+
+    boolean existsByPageAndLemma(Page page, Lemma lemma);
 }
