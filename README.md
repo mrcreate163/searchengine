@@ -303,8 +303,8 @@ This project is ready for deployment to production! See our comprehensive deploy
 
 ### 📚 Deployment Documentation
 
-- **[📘 Complete Deployment Guide (Russian)](DEPLOYMENT_GUIDE.md)** - Подробное пошаговое руководство по развертыванию на Timeweb Cloud с собственным доменом
-- **[⚡ Quick Start Guide (Russian)](DEPLOYMENT_QUICKSTART.md)** - Краткая справка и основные команды
+- **[📘 Complete Deployment Guide (Russian)](guide/DEPLOYMENT_GUIDE.md)** - Подробное пошаговое руководство по развертыванию на Timeweb Cloud с собственным доменом
+- **[⚡ Quick Start Guide (Russian)](guide/DEPLOYMENT_QUICKSTART.md)** - Краткая справка и основные команды
 
 ### 🚀 Quick Deployment Overview
 
@@ -335,7 +335,7 @@ The project includes everything you need for production deployment:
 ./deploy.sh
 ```
 
-For detailed instructions, including Timeweb Cloud setup, DNS configuration, and SSL setup, please refer to the [Complete Deployment Guide](DEPLOYMENT_GUIDE.md).
+For detailed instructions, including Timeweb Cloud setup, DNS configuration, and SSL setup, please refer to the [Complete Deployment Guide](guide/DEPLOYMENT_GUIDE.md).
 
 ## 🤝 Contributing
 

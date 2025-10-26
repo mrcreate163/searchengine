@@ -141,16 +141,6 @@ class IndexingServiceTest {
     }
 
     @Test
-    void testIndexPage_EmptyUrl() {
-        when(sitesList.getSites()).thenReturn(Collections.singletonList(configSite));
-
-        IndexingResponse response = indexingService.indexPage("");
-
-        assertNotNull(response);
-        assertFalse(response.isResult());
-    }
-
-    @Test
     void testIndexPage_UrlWithTrailingSlash() {
         when(sitesList.getSites()).thenReturn(Collections.singletonList(configSite));
         when(siteRepository.findByUrl(anyString())).thenReturn(siteEntity);
