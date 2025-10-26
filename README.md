@@ -355,6 +355,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **mrcreate163**
 - GitHub: [@mrcreate163](https://github.com/mrcreate163)
+- Telegram: [@pletnyov_ilya](https://t.me/pletnyov_ilya)
 
 ## 🙏 Acknowledgments
 
